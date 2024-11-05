@@ -15,6 +15,10 @@ import (
 	"github.com/intel-go/fastjson"
 )
 
+const ToVyosPort uint16 = 0
+
+var VyosNextVlan uint16 = 111
+
 type (
 	ApiSyncHandler struct{}
 	ApiSyncParams  struct {
@@ -124,6 +128,12 @@ type (
 
 	ApiResourceMonitorGetHandler   struct{}
 	ApiResourceMonitorResetHandler struct{}
+
+	ApiClientGetVyosCTunnelKeyHandler struct{}
+	ApiClientGetVyosCTunnelKeyParams  struct{} /* key tunnel, [MAC] */
+	ApiClientGetVyosCTunnelKeyResult  struct {
+		Vec CTunnelDataJson `json:"data"`
+	}
 )
 
 func (h ApiResourceMonitorGetHandler) ServeJSONRPC(ctx interface{}, params *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
@@ -283,7 +293,6 @@ func (h ApiNsIterHandler) ServeJSONRPC(ctx interface{}, params *fastjson.RawMess
 }
 
 func (h ApiNsGetInfoHandler) ServeJSONRPC(ctx interface{}, params *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
-
 	tctx := ctx.(*CThreadCtx)
 	keys, err := tctx.UnmarshalTunnels(*params)
 	if err != nil {
@@ -585,6 +594,50 @@ func getNsAndMacs(ctx interface{}, params *fastjson.RawMessage) (*CNSCtx, []MACK
 	return ns, keys, nil
 }
 
+func GetCTunnelKeyForVyos(key CTunnelKey) CTunnelKey {
+	vyosKey, ok := TrexToVyosCTunnelKeyTable[key]
+	if ok {
+		return vyosKey
+	}
+	if VyosNextVlan > 1000 {
+		errMessage := fmt.Sprintf("[calix]Vlan for Vyos is %d, It is Too big.", VyosNextVlan)
+		panic(errMessage)
+	}
+	vyosKeyDataJson := CTunnelDataJson{
+		Vport: ToVyosPort,
+		Tci:   [5]uint16{VyosNextVlan, 0},
+		Tpid:  [5]uint16{0x8100, 0},
+	}
+	vyosKey.SetJson(&vyosKeyDataJson)
+	TrexToVyosCTunnelKeyTable[key] = vyosKey
+	VyosToTrexCTunnelKeyTable[vyosKey] = key
+	VyosNextVlan++
+	return vyosKey
+}
+
+func (h ApiClientGetVyosCTunnelKeyHandler) ServeJSONRPC(ctx interface{}, params *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
+
+	var res ApiClientGetVyosCTunnelKeyResult
+	tctx := ctx.(*CThreadCtx)
+	var key CTunnelKey
+	err := tctx.UnmarshalTunnel(*params, &key)
+	if err != nil {
+		return nil, &jsonrpc.Error{
+			Code:    jsonrpc.ErrorCodeInvalidRequest,
+			Message: err.Error(),
+		}
+	}
+
+	vyosKey := GetCTunnelKeyForVyos(key)
+	kjson := CTunnelDataJson{}
+	vyosKey.GetJson(&kjson)
+	res.Vec = kjson
+	return res, nil
+}
+
+var TrexToVyosCTunnelKeyTable map[CTunnelKey]CTunnelKey
+var VyosToTrexCTunnelKeyTable map[CTunnelKey]CTunnelKey
+
 func init() {
 	RegisterCB("api_sync_v2", ApiSyncHandler{}, true)
 	RegisterCB("get_version", ApiGetVersionHandler{}, true)
@@ -609,5 +662,8 @@ func init() {
 	RegisterCB("ctx_client_get_def_plugins", ApiClientGetDefPlugHandler{}, false)
 	RegisterCB("ctx_client_iter", ApiClientIterHandler{}, false)
 	/* TBD add client_update */
+	RegisterCB("ctx_client_get_vyos_ns_Key", ApiClientGetVyosCTunnelKeyHandler{}, false)
 
+	TrexToVyosCTunnelKeyTable = make(map[CTunnelKey]CTunnelKey)
+	VyosToTrexCTunnelKeyTable = make(map[CTunnelKey]CTunnelKey)
 }

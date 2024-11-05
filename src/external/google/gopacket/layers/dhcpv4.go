@@ -78,7 +78,7 @@ func (o DHCPMsgType) String() string {
 	}
 }
 
-//DHCPMagic is the RFC 2131 "magic cooke" for DHCP.
+// DHCPMagic is the RFC 2131 "magic cooke" for DHCP.
 var DHCPMagic uint32 = 0x63825363
 
 // DHCPv4 contains data for a single DHCP packet.
@@ -117,6 +117,16 @@ func (o DHCPOptions) String() string {
 	}
 	buf.WriteByte(']')
 	return buf.String()
+}
+
+// Find an Option
+func (o DHCPOptions) Find(t DHCPOpt) int {
+	for index, opt := range o {
+		if opt.Type == DHCPOptRelayAgentInfo {
+			return index
+		}
+	}
+	return -1
 }
 
 // LayerType returns gopacket.LayerTypeDHCPv4
@@ -329,6 +339,7 @@ const (
 	DHCPOptT2                    DHCPOpt = 59  // 4, uint32
 	DHCPOptClassID               DHCPOpt = 60  // n, []byte
 	DHCPOptClientID              DHCPOpt = 61  // n >=  2, []byte
+	DHCPOptRelayAgentInfo        DHCPOpt = 82  // n >=  2, []byte
 	DHCPOptDomainSearch          DHCPOpt = 119 // n, string
 	DHCPOptSIPServers            DHCPOpt = 120 // n, url
 	DHCPOptClasslessStaticRoute  DHCPOpt = 121 //

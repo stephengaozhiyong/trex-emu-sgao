@@ -22,7 +22,9 @@ uint16 pkt_size
 */
 
 import (
+	"bytes"
 	"encoding/binary"
+	"external/google/gopacket/layers"
 	"fmt"
 	"io"
 	"os"
@@ -313,12 +315,90 @@ func (o *VethIFZmq) OnRxStream(stream []byte) {
 
 		m = o.tctx.MPool.Alloc(pktLen)
 		m.SetVPort(uint16(vport))
-		m.Append(stream[of+4 : of+4+pktLen])
+		slice := stream[of+4 : of+4+pktLen]
+		m.Append(slice)
 		o.OnRx(m)
 		of = of + 4 + pktLen
+		useVyos := os.Getenv("USE_VYOS")
+		if useVyos != "yes" {
+			continue
+		}
+		if vport != uint8(ToVyosPort) {
+			ctk := getTunnelKeyFromSlice(slice, uint16(vport))
+			vyosKey := GetCTunnelKeyForVyos(ctk)
+			newSlice := setTunnelKeyToSlice(vyosKey, slice)
+			ns := CNSCtx{Key: vyosKey}
+			c := CClient{Ns: &ns}
+			o.SendBuffer(false, &c, newSlice, false)
+		} else {
+			ctk := getTunnelKeyFromSlice(slice, uint16(vport))
+			trexKey, ok := VyosToTrexCTunnelKeyTable[ctk]
+			if !ok {
+				continue
+			}
+			newSlice := setTunnelKeyToSlice(trexKey, slice)
+			ns := CNSCtx{Key: trexKey}
+			c := CClient{Ns: &ns}
+			o.SendBuffer(false, &c, newSlice, false)
+		}
 	}
 }
 
 func (o *VethIFZmq) AppendSimuationRPC(request []byte) {
 	panic("AppendSimuationRPC should not be called ")
+}
+
+func getTunnelKeyFromSlice(p []byte, port uint16) CTunnelKey {
+	ctk := CTunnelKey{}
+	offset := uint16(14)
+	vlanIndex := 0
+	var d CTunnelData
+	d.Vport = port
+	ethHeader := layers.EthernetHeader(p[0:14])
+	var nextHdr layers.EthernetType
+	nextHdr = layers.EthernetType(ethHeader.GetNextProtocol())
+	for {
+		if nextHdr == layers.EthernetTypeDot1Q {
+			val := binary.BigEndian.Uint32(p[offset-2:offset+2]) & 0xffffffff
+			d.Vlans[vlanIndex] = val
+			vlanIndex++
+			nextHdr = layers.EthernetType(binary.BigEndian.Uint16(p[offset+2 : offset+4]))
+			offset += 4
+		} else {
+			break
+		}
+	}
+	ctk.Set(&d)
+	return ctk
+}
+
+func setTunnelKeyToSlice(ctk CTunnelKey, p []byte) []byte {
+	new := make([]byte, 0)
+	offset := uint16(14)
+	var d CTunnelData
+	ctk.Get(&d)
+	ethHeader := layers.EthernetHeader(p[0:14])
+	var nextHdr layers.EthernetType
+	nextHdr = layers.EthernetType(ethHeader.GetNextProtocol())
+	for {
+		if nextHdr == layers.EthernetTypeDot1Q {
+			nextHdr = layers.EthernetType(binary.BigEndian.Uint16(p[offset+2 : offset+4]))
+			offset += 4
+		} else {
+			break
+		}
+	}
+	// offset是vlan层的结束，ip层的开始，因为offset的前两个字节表示ip层协议，所以需要-2
+	afterVlan := p[offset-2:]
+	// 生成Vlan字段的字节流
+	buffer := bytes.NewBuffer([]byte{})
+	for _, val := range d.Vlans {
+		if val != 0 {
+			binary.Write(buffer, binary.BigEndian, val)
+		}
+	}
+	new = append(new, p[0:12]...)        //Ethernet层，-2个字节的下一层的协议
+	new = append(new, buffer.Bytes()...) // vlan层
+	new = append(new, afterVlan...)      //ip层协议（2字节）+ ip层
+	return new
 }

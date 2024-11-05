@@ -1252,6 +1252,12 @@ func (o *PluginDhcpSrvClient) SendOffer(dhcph layers.DHCPv4, yiaddr core.Ipv4Key
 		copy(l2[0:6], chaddr[:])
 	}
 
+	// add option82
+	index := dhcph.Options.Find(layers.DHCPOptRelayAgentInfo)
+	if index != -1 {
+		dhcp.Options = SequentialInsert(dhcp.Options, dhcph.Options[index])
+	}
+
 	pkt := core.PacketUtlBuild(
 		&ipv4,
 		&layers.UDP{SrcPort: DHCPV4_SERVER_PORT, DstPort: layers.UDPPort(dstPort)},
@@ -1373,6 +1379,12 @@ func (o *PluginDhcpSrvClient) SendAck(dhcph layers.DHCPv4, yiaddr core.Ipv4Key, 
 		copy(l2[0:6], chaddr[:])
 	}
 
+	// add option82
+	index := dhcph.Options.Find(layers.DHCPOptRelayAgentInfo)
+	if index != -1 {
+		dhcp.Options = SequentialInsert(dhcp.Options, dhcph.Options[index])
+	}
+
 	pkt := core.PacketUtlBuild(
 		&ipv4,
 		&layers.UDP{SrcPort: DHCPV4_SERVER_PORT, DstPort: layers.UDPPort(dstPort)},
@@ -1464,6 +1476,12 @@ func (o *PluginDhcpSrvClient) SendNak(dhcph layers.DHCPv4) {
 		dstPort = DHCPV4_SERVER_PORT
 		copy(l2[0:6], []byte{0, 0, 0, 0, 0, 0})
 		fixDstMac = true // Should be replaced by default gateway's MAC
+	}
+
+	// add option82
+	index := dhcph.Options.Find(layers.DHCPOptRelayAgentInfo)
+	if index != -1 {
+		dhcp.Options = SequentialInsert(dhcp.Options, dhcph.Options[index])
 	}
 
 	pkt := core.PacketUtlBuild(
@@ -1936,4 +1954,16 @@ func Register(ctx *core.CThreadCtx) {
 	// In order for this plugin to be included in the EMU compilation one must provide this empty register
 	// function. In case you remove the function call, then the core will not include EMU.
 	ctx.RegisterParserCb(DHCP_SRV_PLUG)
+}
+
+func SequentialInsert(orgOpts layers.DHCPOptions, InOpt layers.DHCPOption) layers.DHCPOptions {
+	inIndex := len(orgOpts)
+	for index, opt := range orgOpts {
+		if InOpt.Type < opt.Type {
+			inIndex = index
+			break
+		}
+	}
+	orgOpts = append(orgOpts[:inIndex], append([]layers.DHCPOption{InOpt}, orgOpts[inIndex:]...)...)
+	return orgOpts
 }

@@ -190,7 +190,7 @@ func (o *socketAppL7) start() {
 	o.appl7.start()
 }
 
-//setPlug(ctx *PluginAppsimClient)
+// setPlug(ctx *PluginAppsimClient)
 func (o *socketAppL7) setPlug(ctx *PluginAppsimClient) {
 	o.simPlug = ctx
 }
@@ -242,7 +242,7 @@ func newTransportSim(params *transportSimParam) *transportSim {
 	simrx = o
 	o.tctx = core.NewThreadCtx(0, 4510, true, &simrx)
 	var key core.CTunnelKey
-	key.Set(&core.CTunnelData{Vport: 1, Vlans: [2]uint32{0x81000001, 0x81000002}})
+	key.Set(&core.CTunnelData{Vport: 1, Vlans: [5]uint32{0x81000001, 0x81000002, 0x81000003, 0x81000004, 0x81000005}})
 	ns := core.NewNSCtx(o.tctx, &key)
 	o.tctx.AddNs(&key, ns)
 

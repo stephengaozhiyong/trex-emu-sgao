@@ -36,14 +36,14 @@ const (
 
 type CTunnelData struct {
 	Vport uint16    // virtual port
-	Vlans [2]uint32 // vlan tags include tpid
+	Vlans [5]uint32 // vlan tags include tpid
 }
 
 /* CTunnelDataJson json representation of tunnel data */
 type CTunnelDataJson struct {
 	Vport   uint16        `json:"vport"`
-	Tpid    [2]uint16     `json:"tpid"`
-	Tci     [2]uint16     `json:"tci"`
+	Tpid    [5]uint16     `json:"tpid"`
+	Tci     [5]uint16     `json:"tci"`
 	Plugins *MapJsonPlugs `json:"plugs"`
 }
 
@@ -55,7 +55,7 @@ type RpcCmdTunnels struct {
 	Tunnels []CTunnelDataJson `json:"tunnels" validate:"required"`
 }
 
-type CTunnelKey [4 + 4 + 4]byte
+type CTunnelKey [4 + 4 + 4 + 4 + 4 + 4]byte
 
 func (o *CTunnelKey) DumpHex() {
 	fmt.Println(hex.Dump(o[0:]))
@@ -65,7 +65,7 @@ func (o CTunnelKey) toString(newLine bool) string {
 	var d CTunnelData
 	o.Get(&d)
 	s := fmt.Sprintf("%d,", d.Vport)
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 5; i++ {
 		s += fmt.Sprintf("{%04x:%04x}", ((d.Vlans[i] & 0xffff0000) >> 16), (d.Vlans[i] & 0xffff))
 		if i < 1 {
 			s += fmt.Sprintf(",")
@@ -86,7 +86,7 @@ func (o CTunnelKey) StringRpc() string {
 }
 
 func (o *CTunnelKey) Clear() {
-	*o = CTunnelKey([12]byte{})
+	*o = CTunnelKey([24]byte{})
 }
 
 func (o *CTunnelKey) Set(d *CTunnelData) {
@@ -94,12 +94,18 @@ func (o *CTunnelKey) Set(d *CTunnelData) {
 	binary.LittleEndian.PutUint16(o[0:2], d.Vport)
 	binary.LittleEndian.PutUint32(o[4:8], d.Vlans[0])
 	binary.LittleEndian.PutUint32(o[8:12], d.Vlans[1])
+	binary.LittleEndian.PutUint32(o[12:16], d.Vlans[2])
+	binary.LittleEndian.PutUint32(o[16:20], d.Vlans[3])
+	binary.LittleEndian.PutUint32(o[20:24], d.Vlans[4])
 }
 
 func (o *CTunnelKey) Get(d *CTunnelData) {
 	d.Vport = binary.LittleEndian.Uint16(o[0:2])
 	d.Vlans[0] = binary.LittleEndian.Uint32(o[4:8])
 	d.Vlans[1] = binary.LittleEndian.Uint32(o[8:12])
+	d.Vlans[2] = binary.LittleEndian.Uint32(o[12:16])
+	d.Vlans[3] = binary.LittleEndian.Uint32(o[16:20])
+	d.Vlans[4] = binary.LittleEndian.Uint32(o[20:24])
 }
 
 func (o *CTunnelKey) GetJson(d *CTunnelDataJson) {
@@ -108,11 +114,24 @@ func (o *CTunnelKey) GetJson(d *CTunnelDataJson) {
 	d.Vport = t.Vport
 	if t.Vlans[0] != 0 {
 		d.Tpid[0] = uint16(((t.Vlans[0] & 0xffff0000) >> 16))
-		d.Tci[0] = uint16((t.Vlans[0] & 0xfff))
+		d.Tci[0] = uint16((t.Vlans[0] & 0xffff))
 
 		if t.Vlans[1] != 0 {
 			d.Tpid[1] = uint16(((t.Vlans[1] & 0xffff0000) >> 16))
-			d.Tci[1] = uint16((t.Vlans[1] & 0xfff))
+			d.Tci[1] = uint16((t.Vlans[1] & 0xffff))
+
+			if t.Vlans[2] != 0 {
+				d.Tpid[2] = uint16(((t.Vlans[2] & 0xffff0000) >> 16))
+				d.Tci[2] = uint16((t.Vlans[2] & 0xffff))
+				if t.Vlans[3] != 0 {
+					d.Tpid[3] = uint16(((t.Vlans[3] & 0xffff0000) >> 16))
+					d.Tci[3] = uint16((t.Vlans[3] & 0xffff))
+					if t.Vlans[4] != 0 {
+						d.Tpid[4] = uint16(((t.Vlans[4] & 0xffff0000) >> 16))
+						d.Tci[4] = uint16((t.Vlans[4] & 0xffff))
+					}
+				}
+			}
 		}
 	}
 }
@@ -122,13 +141,13 @@ func (o *CTunnelKey) SetJson(d *CTunnelDataJson) {
 
 	t.Vport = d.Vport
 
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 5; i++ {
 		if d.Tci[i] > 0 {
 			tpid := uint16(DEF_TPID)
 			if d.Tpid[i] > 0 {
 				tpid = d.Tpid[i]
 			}
-			t.Vlans[i] = (uint32(tpid) << 16) + uint32((d.Tci[i] & 0xfff))
+			t.Vlans[i] = (uint32(tpid) << 16) + uint32((d.Tci[i] & 0xffff))
 		}
 	}
 

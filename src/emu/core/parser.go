@@ -60,8 +60,11 @@ type ParserPacketState struct {
 	NextHeader uint8 // next header for ipv6
 }
 
-/*ParserCb callback function for a protocol. In case the return value is zero, it means the protocol handle the packet
-  and there is no need to free the mbuf. if the return value is not zero the parser will handle the mbuf free */
+/*
+ParserCb callback function for a protocol. In case the return value is zero, it means the protocol handle the packet
+
+	and there is no need to free the mbuf. if the return value is not zero the parser will handle the mbuf free
+*/
 type ParserCb func(ps *ParserPacketState) int
 
 type ParserStats struct {
@@ -749,9 +752,9 @@ func processIpv6Options(p []byte, flags *uint32) int {
 ParsePacket
 return values
 
-   0   process by the parser callback
-   -1  parser error
-   -2  internal parser error
+	0   process by the parser callback
+	-1  parser error
+	-2  internal parser error
 */
 func (o *Parser) ParsePacket(m *Mbuf) int {
 	var tun CTunnelKey
@@ -803,7 +806,7 @@ func (o *Parser) ParsePacket(m *Mbuf) int {
 				o.stats.errDot1qTooShort++
 				return PARSER_ERR
 			}
-			if vlanIndex > 1 {
+			if vlanIndex > 4 {
 				o.stats.errToManyDot1q++
 				return PARSER_ERR
 			}

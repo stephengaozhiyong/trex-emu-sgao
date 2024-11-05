@@ -216,8 +216,8 @@ type CNSCtx struct {
 
 type CNsInfo struct {
 	Port          uint16    `json:"vport" validate:"required"`
-	Tci           [2]uint16 `json:"tci"`
-	Tpid          [2]uint16 `json:"tpid"`
+	Tci           [5]uint16 `json:"tci"`
+	Tpid          [5]uint16 `json:"tpid"`
 	ActiveClients uint64    `json:"active_clients"`
 	PlugNames     []string  `json:"plug_names"`
 }
@@ -240,7 +240,7 @@ func NewNSCtx(tctx *CThreadCtx,
 	return o
 }
 
-//OnRemove called before remove
+// OnRemove called before remove
 func (o *CNSCtx) OnRemove() {
 	o.PluginCtx.OnRemove()
 }
