@@ -20,6 +20,8 @@ type CClientStats struct {
 	activeClients uint64
 }
 
+type PbitList [5]uint8
+
 func NewClientStatsCounterDb(o *CClientStats) *CCounterDb {
 	db := NewCCounterDb("client")
 	db.Add(&CCounterRec{
@@ -56,7 +58,7 @@ type CClientDg struct {
 	IpdgMac      MACKey `json:"rmac"`    // default
 }
 
-//CClientIpv6Nd information from learned from router
+// CClientIpv6Nd information from learned from router
 type CClientIpv6Nd struct {
 	MTU        uint16  `json:"mtu"`   // MTU in L3 1500 by default
 	DgMac      MACKey  `json:"dgmac"` // router dg
@@ -98,6 +100,8 @@ type CClient struct {
 	bitMask            uint8      // Bit mask for resolving message
 	resolveAttempts    uint8      // Counter counting how many times have we tried to resolve
 	maxResolveAttempts uint8      // Maximum amount of resolves allowed
+
+	PbitList PbitList //pbit list
 }
 
 type CClientCmd struct {
@@ -115,6 +119,8 @@ type CClientCmd struct {
 	Ipv4ForcedgMac MACKey `json:"ipv4_force_mac"`
 
 	Plugins *MapJsonPlugs `json:"plugs"`
+
+	PbitList PbitList `json:"pbit_list"`
 }
 
 type CClientCmds struct {
@@ -144,6 +150,8 @@ type CClientInfo struct {
 	Ipv6DGW    *CClientDg     `json:"ipv6_dgw"`
 
 	PlugNames []string `json:"plug_names"`
+
+	PbitList PbitList `json:"pbit_list"`
 }
 
 /* NewClient Create a new client with default information and key */
@@ -180,7 +188,7 @@ func NewClientCmd(ns *CNSCtx, cmd *CClientCmd) *CClient {
 	c.Ipv6ForcedgMac = cmd.Ipv6ForcedgMac
 	c.ForceDGW = cmd.ForceDGW
 	c.Ipv4ForcedgMac = cmd.Ipv4ForcedgMac
-
+	c.PbitList = cmd.PbitList
 	return c
 }
 
@@ -360,8 +368,9 @@ func (o *CClient) GetL2Header(broadcast bool, next uint16) []byte {
 		b = append(b, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0)
 	}
 	b = append(b, o.Mac[:]...)
-	for _, val := range tund.Vlans {
+	for i, val := range tund.Vlans {
 		if val != 0 {
+			val |= (((uint32(o.PbitList[i])) << 13) & 0x0000e000)
 			b = append(b, 0, 0, 0, 0)
 			binary.BigEndian.PutUint32(b[len(b)-4:], val)
 		}
@@ -423,6 +432,8 @@ func (o *CClient) GetInfo() *CClientInfo {
 	info.Ipv6DGW = o.Ipv6DGW
 
 	info.PlugNames = o.PluginCtx.GetAllPlugNames()
+
+	info.PbitList = o.PbitList
 
 	return &info
 }

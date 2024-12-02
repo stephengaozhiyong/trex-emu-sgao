@@ -114,21 +114,21 @@ func (o *CTunnelKey) GetJson(d *CTunnelDataJson) {
 	d.Vport = t.Vport
 	if t.Vlans[0] != 0 {
 		d.Tpid[0] = uint16(((t.Vlans[0] & 0xffff0000) >> 16))
-		d.Tci[0] = uint16((t.Vlans[0] & 0xffff))
+		d.Tci[0] = uint16((t.Vlans[0] & 0xfff))
 
 		if t.Vlans[1] != 0 {
 			d.Tpid[1] = uint16(((t.Vlans[1] & 0xffff0000) >> 16))
-			d.Tci[1] = uint16((t.Vlans[1] & 0xffff))
+			d.Tci[1] = uint16((t.Vlans[1] & 0xfff))
 
 			if t.Vlans[2] != 0 {
 				d.Tpid[2] = uint16(((t.Vlans[2] & 0xffff0000) >> 16))
-				d.Tci[2] = uint16((t.Vlans[2] & 0xffff))
+				d.Tci[2] = uint16((t.Vlans[2] & 0xfff))
 				if t.Vlans[3] != 0 {
 					d.Tpid[3] = uint16(((t.Vlans[3] & 0xffff0000) >> 16))
-					d.Tci[3] = uint16((t.Vlans[3] & 0xffff))
+					d.Tci[3] = uint16((t.Vlans[3] & 0xfff))
 					if t.Vlans[4] != 0 {
 						d.Tpid[4] = uint16(((t.Vlans[4] & 0xffff0000) >> 16))
-						d.Tci[4] = uint16((t.Vlans[4] & 0xffff))
+						d.Tci[4] = uint16((t.Vlans[4] & 0xfff))
 					}
 				}
 			}
@@ -147,7 +147,7 @@ func (o *CTunnelKey) SetJson(d *CTunnelDataJson) {
 			if d.Tpid[i] > 0 {
 				tpid = d.Tpid[i]
 			}
-			t.Vlans[i] = (uint32(tpid) << 16) + uint32((d.Tci[i] & 0xffff))
+			t.Vlans[i] = (uint32(tpid) << 16) + uint32((d.Tci[i] & 0xfff))
 		}
 	}
 
