@@ -236,6 +236,7 @@ type PluginDhcpClient struct {
 	serverIdOptOffset          uint16 // Offset of DHCP Server Identifier Option in DHCP Request
 	dhcpReqRenewLength         uint16 // Length of template DHCP Request Renew packet including options
 	renewMsgTypeOptOffset      uint16 // Offset of Message Type Option in DHCP Request Renew
+	serverIdOptOffsetRelease   uint16 // Offset of DHCP Server Identifier Option in DHCP Release
 }
 
 var dhcpEvents = []string{}
@@ -448,6 +449,7 @@ func (o *PluginDhcpClient) preparePacketTemplate() {
 
 	renewOptions := make(map[layers.DHCPOpt][]byte)
 	renewOptions[layers.DHCPOptMessageType] = []byte{byte(layers.DHCPMsgTypeRequest)}
+	renewOptions[layers.DHCPOptServerID] = []byte{0, 0, 0, 0}
 	renewOptions[layers.DHCPOptClientID] = options
 
 	if (o.init.Options != nil) && (o.init.Options.Renew != nil) {
@@ -468,7 +470,9 @@ func (o *PluginDhcpClient) preparePacketTemplate() {
 		if option.Type == layers.DHCPOptMessageType {
 			o.renewMsgTypeOptOffset = o.dhcpReqRenewLength + 2 // 2 for type + length
 		}
-
+		if option.Type == layers.DHCPOptServerID {
+			o.serverIdOptOffsetRelease = o.dhcpReqRenewLength + 2 // 2 for type + length
+		}
 		if option.Type == layers.DHCPOptPad {
 			o.dhcpReqRenewLength++
 		} else {
@@ -537,6 +541,10 @@ func (o *PluginDhcpClient) SendRenewRebind(rebind bool, release bool, timerSec u
 
 	copy(pkt[clientIpOffset:clientIpOffset+4], o.ipv4[:])
 	if release {
+		// Add by Stephen Gao, dhcp release packet must have server id option
+		serverIdOffset := dhcpOffset + o.serverIdOptOffsetRelease
+		copy(pkt[serverIdOffset:serverIdOffset+4], o.server[:])
+
 		pkt[renewMsgTypeOffset] = byte(layers.DHCPMsgTypeRelease)
 	} else {
 		pkt[renewMsgTypeOffset] = byte(layers.DHCPMsgTypeRequest)
